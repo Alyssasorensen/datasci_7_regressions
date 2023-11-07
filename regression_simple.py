@@ -3,76 +3,78 @@ import statsmodels.api as sm
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import stats
+from sklearn.linear_model import LinearRegression
 
 from statsmodels.stats.diagnostic import linear_rainbow
 from scipy.stats import shapiro
+from sklearn.model_selection import train_test_split
 from statsmodels.stats.diagnostic import het_goldfeldquandt
 
+url = "https://raw.githubusercontent.com/Alyssasorensen/datasci_7_regressions/main/datasets/U.S._Chronic_Disease_Indicators__CDI_%20(2).csv"
+df = pd.read_csv(url)
+df
 
-# Sample data
-data = {
-    'BMI': [24.679912, 34.186786, 30.577900, 28.377865, 21.074308, 26.647627, 27.125092, 25.554427, 18.919416, 20.280209],
-    'Blood Pressure': [117.455103, 129.785142, 126.325654, 112.628953, 110.513102, 115.892390, 120.302129, 120.037400, 109.762577, 114.556229]
-}
-df = pd.DataFrame(data)
+### Dependent Variable: DataValue
+## This variable represents the value of a particular metric or measurement. It can be considered the dependent variable because it's the value that you might want to predict or analyze in relation to other factors.
 
-# Fit the regression model
-X = sm.add_constant(df['BMI'])  # Adds a constant term to the predictor
-model = sm.OLS(df['Blood Pressure'], X)
-results = model.fit()
+### Independent Variable: YearStart
+## YearStart is a numerical variable that represents the starting year of a data record. It can be considered the independent variable in this context because it can be used to analyze how the dependent variable (DataValue) changes over different years.
 
-# Print summary of the regression
-print(results.summary())
+# Filter the dataset to keep only the relevant columns
+df = df[['YearStart', 'DataValue']]
 
-residuals = results.resid
-fitted = results.fittedvalues
+# Drop rows with missing values
+df.dropna(inplace=True)
 
+X = df[['YearStart']]
+y = df['DataValue']
 
-##### CHECKING ASSUMPTIONS #####
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-### Assessing linearity of the relationship
-stat, p_value = linear_rainbow(results)
-print(f"Rainbow Test: stat={stat}, p-value={p_value}")
+regressor = LinearRegression()
+regressor.fit(X_train, y_train)
 
-## A significant p-value indicates that the relationship is not linear.
-# Plot observed vs fitted values
+y_pred = regressor.predict(X_test)
+y_pred
+
 plt.figure(figsize=(10, 6))
-sns.scatterplot(x=df['Blood Pressure'], y=fitted)
-plt.xlabel('Observed Values')
-plt.ylabel('Fitted Values')
-plt.title('Observed vs Fitted Values')
-plt.plot([min(df['Blood Pressure']), max(df['Blood Pressure'])], [min(fitted), max(fitted)], color='red', linestyle='--')
+plt.scatter(X_test, y_test, color='blue', label='Actual Data Points')
+plt.plot(X_test, y_pred, color='red', linewidth=2, label='Regression Line')
+plt.title('Simple Linear Regression')
+plt.xlabel('YearStart')
+plt.ylabel('DataValue')
+plt.legend()
 plt.show()
 
-
-
-### Assessing normality of the residuals
-W, p_value = shapiro(residuals)
-print(f"Shapiro-Wilk Test: W={W}, p-value={p_value}")
-
-# Plot Q-Q plot of residuals
+# Check linearity (scatterplot)
 plt.figure(figsize=(10, 6))
-stats.probplot(residuals, plot=plt)
-plt.title('Q-Q Plot of Residuals')
+sns.scatterplot(x=X_test['YearStart'], y=y_test)
+plt.title('Linearity Check')
+plt.xlabel('YearStart')
+plt.ylabel('DataValue')
 plt.show()
 
-
-
-##### Assessing the homogeneity of variance of the residuals
-gq_test = het_goldfeldquandt(residuals, results.model.exog)
-print(f"Goldfeld-Quandt Test: F-statistic={gq_test[0]}, p-value={gq_test[1]}")
-
-# a significant p-value indicates heteroscedasticity, meaning that the variance of the 
-# residuals is not constant across different levels of the independent variable(s).
-
-## Goldfeld-Quandt Test: The Goldfeld-Quandt test is another test used to assess homoscedasticity.
-## It divides the data into two groups and compares the variance of the residuals in the two groups.
-
-# Plot residuals vs fitted values
+# Check independence of errors (residual plot)
+residuals = y_test - y_pred
 plt.figure(figsize=(10, 6))
-sns.scatterplot(x=fitted, y=residuals)
-plt.axhline(0, color='red', linestyle='--')
-plt.xlabel('Fitted Values')
+sns.residplot(x=X_test['YearStart'], y=residuals, lowess=True, line_kws={'color': 'red'})
+plt.title('Residual Plot for Independence of Errors')
+plt.xlabel('YearStart')
 plt.ylabel('Residuals')
-plt.title('Residuals vs Fitted Values')
 plt.show()
+
+# Check constant variance (homoscedasticity)
+plt.figure(figsize=(10, 6))
+sns.scatterplot(x=y_pred, y=residuals)
+plt.title('Homoscedasticity Check')
+plt.xlabel('Predicted Values')
+plt.ylabel('Residuals')
+plt.show()
+
+# Check normality of errors (Q-Q plot)
+import scipy.stats as stats
+plt.figure(figsize=(10, 6))
+stats.probplot(residuals, dist="norm", plot=plt)
+plt.title('Normality of Residuals (Q-Q Plot)')
+plt.show()
+
